@@ -1,0 +1,181 @@
+#!/usr/bin/perl
+use strict;
+
+=head1 easy2ban
+
+easy2ban will monitor a log file or some other program
+and look for pattern matches.  And when matches are found
+it "bans" the ip by writting the ban time to a file.
+Some other program can take care of enforcing the ban.
+
+This program is in the earliest stages of development and
+is currently only a crude proof of concept.
+
+=cut
+
+#
+# Config
+#
+my $files = "local.log";
+my $input_cmd = "sudo tail -qf $files |";
+my $max_hits = 2;	# max hits
+my $interval = 1;	# per minutes
+my $ban_dir = "var/ban";  # directory where ban files go
+my $ban_interval = 5;   # (minutes)
+
+my @laws = (qr/password failed/, qr/XXX/);
+
+
+unless (-d $ban_dir) {
+	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
+				. "  Please create it and try again.\n";
+	return 1;
+}
+
+my $input;
+open($input, "$input_cmd")
+	or die "open '$input_cmd' failed: $!\n";
+
+# Journal of IPs that have broken laws
+my %journal;
+#  %journal = (
+#     ip => [<hits at minute 0>, <hits at minute 1> ..., <... n>]
+#  );
+
+
+my $cur_minute;
+while (my $line = <$input>) {
+	chomp($line);
+
+	# Rate is calculated based on minutes of data.
+
+	# If minute has changed, shift the data (hit counts)
+	my $minute = get_minute();
+	if ($minute != $cur_minute) {
+		# remove oldest entry
+		foreach my $ip (keys %journal) {
+			my $entry = $journal{$ip};
+			pop @$entry;
+
+			if (0 == @$entry) {
+				delete $journal{$ip};
+			}
+		}
+
+		$cur_minute = $minute;
+	}
+
+	# Check all the laws
+	foreach my $law (@laws) {
+		# If one has been broken
+		if ($line =~ $law) {
+			my $ip = get_ip($line);
+
+			# skip if ip could not be found
+			if (! defined $ip) {
+				print STDERR "Got a hit, but could not find\n"
+						."  the IP in line '$line', skipping.\n";
+				last;
+			}
+
+			# record hit on this IP
+			if (exists $journal{$ip}) {
+				($journal{$ip}->[0])++;
+			} else {
+				# add initial entry
+				$journal{$ip} = [1];
+			}
+
+
+			last;
+		}
+	}
+
+	# Recalculate counts, ban ips
+	foreach my $ip (keys %journal) {
+		my $hits = $journal{$ip};
+		my $sum = 0;
+		foreach my $hit (@$hits) {
+			$sum += $hit;
+		}
+		if ($sum > $max_hits) {
+			ban($ip, $ban_dir, $ban_interval);
+		}
+	}
+}
+
+sub get_minute {
+	(localtime(time))[1];
+}
+
+=head2 get_ip()
+
+Given a line from a log file containing an IPv4 address
+
+  66.249.73.80 - - [05/Mar/2014:20:29:32 -0600] "GET / HTTP/1.1" 200 425 "-" "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+
+try to extract the ip address and return it as a string.
+If no address is found, return undef.
+
+=cut
+
+sub get_ip {
+	my ($line) = @_;
+
+	if ($line =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
+		return $1;
+	}
+
+	return;
+}
+
+=head2 ban()
+
+An IP is "banned" by writing a ban time (in minutes) to a
+file whose name is the IP address.
+
+  $ cat var/ban/192.168.2.1
+  5
+
+Some other program should monitor this directory, apply
+the ban rule, and remove the ban file after the interval
+is finished.
+
+=cut
+
+sub ban {
+	my ($ip, $ban_dir, $ban_interval) = @_;
+
+	my $ban_file = "$ban_dir/$ip";
+
+	my $ban_fh;
+	my $res;
+
+	if (! -e $ban_file) {
+		if (!open ($ban_fh, ">", $ban_file)) {
+			print STDERR "Unable to create ban file '$ban_file': $!\n";
+			return;
+		}
+		print $ban_fh "$ban_interval\n";
+		close $ban_fh;
+	} else {
+		if (!open ($ban_fh, "+<", $ban_file)) {
+			print STDERR "Unable to open ban file '$ban_file': $!\n";
+			return;
+		}
+
+		# Get the remaining ban time
+		my $cur_ban_interval = <$ban_fh>;
+		chomp($cur_ban_interval);
+	
+		# write our time if it is longer
+		if ($ban_interval > $cur_ban_interval) {
+			truncate $ban_fh, 0;
+			seek $ban_fh, 0, 0;
+	
+			print $ban_fh "$ban_interval\n";
+		}
+
+		close $ban_fh;
+	}
+}
