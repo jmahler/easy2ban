@@ -29,7 +29,12 @@ my @laws = (qr/password failed/, qr/XXX/);
 unless (-d $ban_dir) {
 	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
 				. "  Please create it and try again.\n";
-	return 1;
+	exit 1;
+}
+
+if ($interval > 60) {
+	print STDERR "Intervals larger than 60 minutes are not supported\n";
+	exit 1;
 }
 
 my $input;
@@ -43,27 +48,36 @@ my %journal;
 #  );
 
 
-my $cur_minute;
+my $cur_minute = get_minute();
 while (my $line = <$input>) {
 	chomp($line);
 
 	# Rate is calculated based on minutes of data.
 
-	# If minute has changed, shift the data (hit counts)
+	# Shift the journal of hit counts according to the
+	# number of minutes that have elapsed.
 	my $minute = get_minute();
-	if ($minute != $cur_minute) {
-		# remove oldest entry
+	while ($cur_minute != $minute) {
+
+		# shift data ...
 		foreach my $ip (keys %journal) {
 			my $entry = $journal{$ip};
 
+			# create new entry with zero
 			unshift @$entry, (0);
 
+			# discard oldest if beyond interval
 			if (@$entry > $interval) {
 				pop @$entry;
 			}
 		}
 
-		$cur_minute = $minute;
+		# increment but loop at 60 minutes
+		if ($cur_minute < 59) {
+			$cur_minute++;
+		} else {
+			$cur_minute = 0;
+		}
 	}
 
 	# Check all the laws
