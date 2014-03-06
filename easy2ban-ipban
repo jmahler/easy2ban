@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+use strict;
+use Getopt::Std;
+
+=head1 easy2ban-ipban
+
+The easy2ban-ipban daemon monitors a ban directory and
+bans IPs by creating iptables rules that drop packets from
+that IP.
+
+  ./easy2ban-ipban -d "var/bin" -v
+
+It assumes that there is some other daemon (easy2ban) that
+is creating the ban files and storing the ban time in minutes.
+
+The operation of this daemon is quite simple.
+It looks at all the ban (IP) files in the ban directory and
+bans any that still have time left.  It decrements the time
+left of each as well.  When the ban time expires it un-bans the
+IP and removes the ban (IP) file.  Then it sleeps for 1 minute
+and afterwards repeats the process again.
+
+=cut
+
+my %opt;
+getopts('d:i:vh', \%opt) or usage();
+usage() if $opt{h};
+
+# Command line options
+my $ban_dir = (exists $opt{'d'}) ? $opt{'d'} : "var/ban";	# ban directory
+my $verbose = $opt{'v'};
+my $ban_chain = (exists $opt{'i'}) ? $opt{'i'} : "easy2ban";
+
+unless (-d $ban_dir) {
+	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
+				. "  Please create it and try again.\n";
+	exit 1;
+}
+
+# Make sure our ban chain exists, create it if it doesn't
+my $exists = `sudo iptables -nL $ban_chain 2>&1`;
+# iptables: No chain/target/match by that name.
+if ($exists =~ /No chain/) {
+	print "creating easy2ban chain\n" if $verbose;
+	`sudo iptables -N $ban_chain`;
+	#`sudo iptables -A $ban_chain -j RETURN`;
+	`sudo iptables -I INPUT -j $ban_chain`;
+}
+# to delete:
+# iptables -F easy2ban
+# iptables -D INPUT easy2ban
+# iptables -X easy2ban
+
+# Make sure our chain is clean
+print "flushing easy2ban chain\n" if $verbose;
+`sudo iptables -F $ban_chain`;
+
+while (1) {
+
+	my $dh;
+	if (! opendir $dh, $ban_dir) {
+		print STDERR "Couldn't open ban directory '$ban_dir': $!";
+		exit 1;
+	}
+
+	my @ips = readdir $dh;
+
+	foreach my $ip (@ips) {
+
+		# skip unexpected file names
+		next if ($ip !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/);
+
+		my $ip_fh;
+		if (! open($ip_fh, "+<", "$ban_dir/$ip")) {
+			print STDERR "Unable to open '$ban_dir/$ip': $!";
+			next;
+		}
+		# read the minutes left
+		my $min = <$ip_fh>;
+		chomp($min);
+
+		if ($min <= 0) {
+			# if zero minutes left, delete the file, unban
+			close $ip_fh;
+			if (! unlink "$ban_dir/$ip") {
+				print STDERR "Unable to unlink '$ban_dir/$ip': $!";
+				close $ip_fh;
+				next;
+			}
+
+			ipunban($ip);
+		} else {
+			# otherwise decrement the minutes left
+
+			truncate $ip_fh, 0;  # discard current contents
+			seek $ip_fh, 0, 0;  # to beginning
+
+			$min = $min - 1;
+
+			print $ip_fh "$min\n";
+
+			ipban($ip);
+		}
+
+		close $ip_fh;
+	}
+
+	closedir $dh;
+
+	print "sleep 1 minute\n" if $verbose;
+	sleep 60;  # 1 minute
+}
+
+=head2 ipban(), ipunban()
+
+ipban() bans an IP address by inserting a -j DROP rule using iptables.
+
+ipunban() does the inverse of ipban() and released the IP.
+
+=cut
+
+sub ipban {
+	my ($ip) = @_;
+
+	# It is assumed that exists of the banned chain has already
+	# been checked and is available.
+
+	# check if it is currently banned
+	my $is_banned = `sudo iptables -nL $ban_chain | grep $ip`;
+	if ($is_banned) {
+		print "$ip is already banned\n" if $verbose;
+		return;
+	} else {
+		print "$ip banned (new)\n" if $verbose;
+		`sudo iptables -I $ban_chain -s $ip -j DROP`;
+	}
+}
+
+sub ipunban {
+	my ($ip) = @_;
+
+	print "unban: $ip\n" if $verbose;
+	`sudo iptables -D $ban_chain -s $ip -j DROP 2>&1`;
+}
+
+sub usage {
+	print STDERR <<"EOF";
+
+  usage: $0 -d "var/bin" [-i "easy2ban"] [-v] [-h]
+
+    -d "var/bin"    : directory where ban files are stored
+
+    -i "easy2ban"   : name of iptables chain to store rules
+
+    -v              : verbose output
+
+    -h              : help
+
+EOF
+	exit;
+}
