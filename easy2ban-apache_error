@@ -1,15 +1,15 @@
 #!/bin/bash -x
 
-# Example showning how to use easy2ban with Qmail maillog
-# to look for password failures.
+# Example showning how to use easy2ban with Apache
+# error_log to look for failures.
 #
 
 BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)
 MONITOR_TIME=5;  # (minutes)
-MAX_HITS=4;
-LAWS="qr/password fail/";
-CMD="sudo qtail maillog |";
+MAX_HITS=10;
+LAWS="qr/File does not exist/";
+CMD="sudo tail -qf /home/*/*/log/error_log |";
 
 mkdir -p var/ban
 

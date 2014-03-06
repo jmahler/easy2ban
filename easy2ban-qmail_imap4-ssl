@@ -11,7 +11,6 @@ MAX_HITS=4;
 LAWS="qr/LOGIN FAILED/";
 CMD="sudo qtail imap4-ssl |";
 
-touch local.log
 mkdir -p var/ban
 
 ./easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME
