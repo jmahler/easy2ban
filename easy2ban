@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use strict;
+use Getopt::Std;
 
 =head1 easy2ban
 
@@ -13,18 +14,27 @@ is currently only a crude proof of concept.
 
 =cut
 
-#
-# Config
-#
-my $files = "local.log";
-my $input_cmd = "sudo tail -qf $files |";
-my $max_hits = 2;	# max hits
-my $interval = 2;	# per minutes
-my $ban_dir = "var/ban";  # directory where ban files go
-my $ban_interval = 5;   # (minutes)
-my $verbose = 1;
+my %opt;
+getopts('c:L:x:i:d:b:vh', \%opt) or usage();
+usage() if $opt{h};
 
-my @laws = (qr/password failed/, qr/XXX/);
+# Command line options
+usage() if (! $opt{'c'});
+my $input_cmd = $opt{'c'};
+
+usage() if (! $opt{'L'});
+my $laws_str = $opt{'L'};
+my @laws = (eval($laws_str));
+
+my $max_hits = (exists $opt{'x'}) ? $opt{'x'} : 2;          # max hits
+
+my $interval = (exists $opt{'i'}) ? $opt{'i'} : 2;			# per minutes
+
+my $ban_dir = (exists $opt{'d'}) ? $opt{'d'} : "var/ban";	# ban directory
+
+my $ban_interval = (exists $opt{'b'}) ? $opt{'b'} : 5;		# (minutes)
+
+my $verbose = $opt{'v'};
 
 
 unless (-d $ban_dir) {
@@ -42,12 +52,12 @@ my $input;
 open($input, "$input_cmd")
 	or die "open '$input_cmd' failed: $!\n";
 
+
 # Journal of IPs that have broken laws
 my %journal;
 #  %journal = (
 #     ip => [<hits at minute 0>, <hits at minute 1> ..., <... n>]
 #  );
-
 
 my $cur_minute = get_minute();
 while (my $line = <$input>) {
@@ -205,4 +215,33 @@ sub ban {
 
 		close $ban_fh;
 	}
+}
+
+sub usage {
+	print STDERR <<"EOF";
+
+  usage: $0 -c "cmd" -L "qr/<regex>, ..." [-x 2] [-i 2]
+                    [-d "var/ban"] [-b 5] [-vh]
+
+    -c              : data command, formatted for Perl open (pipe)
+                        "sudo tail -qf /var/log/syslog |"
+
+    -L              : laws regexes formatted for Perl
+                        "qr/password failed/, qr/LOGIN FAILED/"
+
+           Refer to the code if -c or -L do not make sense.
+
+    -x 2            : max hits per interval
+
+    -i 2            : monitor interval (minutes)
+
+    -d "var/bin"    : directory to store ip and times
+
+    -b 5            : ban interval (minutes)
+
+    -v              : verbose output
+
+    -h              : help
+EOF
+	exit;
 }
