@@ -19,7 +19,7 @@ is currently only a crude proof of concept.
 my $files = "local.log";
 my $input_cmd = "sudo tail -qf $files |";
 my $max_hits = 2;	# max hits
-my $interval = 1;	# per minutes
+my $interval = 2;	# per minutes
 my $ban_dir = "var/ban";  # directory where ban files go
 my $ban_interval = 5;   # (minutes)
 
@@ -55,10 +55,11 @@ while (my $line = <$input>) {
 		# remove oldest entry
 		foreach my $ip (keys %journal) {
 			my $entry = $journal{$ip};
-			pop @$entry;
 
-			if (0 == @$entry) {
-				delete $journal{$ip};
+			unshift @$entry, (0);
+
+			if (@$entry > $interval) {
+				pop @$entry;
 			}
 		}
 
@@ -86,7 +87,6 @@ while (my $line = <$input>) {
 				$journal{$ip} = [1];
 			}
 
-
 			last;
 		}
 	}
@@ -98,6 +98,12 @@ while (my $line = <$input>) {
 		foreach my $hit (@$hits) {
 			$sum += $hit;
 		}
+
+		if (0 == $sum) {
+			delete $journal{$ip};
+			next;
+		}
+
 		if ($sum > $max_hits) {
 			ban($ip, $ban_dir, $ban_interval);
 		}
