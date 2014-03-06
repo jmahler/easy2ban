@@ -8,7 +8,7 @@ BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)
 MONITOR_TIME=5;  # (minutes)
 MAX_HITS=4;
-LAWS="qr/password fail/";
+LAWS="qr/password fail/, qr/user not found/";
 CMD="sudo qtail maillog |";
 
 mkdir -p var/ban
