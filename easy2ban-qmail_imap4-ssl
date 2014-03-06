@@ -8,8 +8,8 @@ BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)
 MONITOR_TIME=5;  # (minutes)
 MAX_HITS=4;
-LAWS="qr/password fail/";
-CMD="sudo qtail maillog |";
+LAWS="qr/LOGIN FAILED/";
+CMD="sudo qtail imap4-ssl |";
 
 touch local.log
 mkdir -p var/ban

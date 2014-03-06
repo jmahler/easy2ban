@@ -80,7 +80,6 @@ while (my $line = <$input>) {
 
 			# discard oldest if beyond interval
 			if (@$entry > $interval) {
-				print "discarding oldest entry for '$ip'\n" if $verbose;
 				pop @$entry;
 			}
 		}
@@ -94,6 +93,7 @@ while (my $line = <$input>) {
 	}
 
 	# Check all the laws
+	my $no_hits = 1;
 	foreach my $law (@laws) {
 		# If one has been broken
 		if ($line =~ $law) {
@@ -106,6 +106,9 @@ while (my $line = <$input>) {
 				last;
 			}
 
+			$no_hits = 0;
+			print "hit $ip\n" if $verbose;
+
 			# record hit on this IP
 			if (exists $journal{$ip}) {
 				($journal{$ip}->[0])++;
@@ -117,22 +120,24 @@ while (my $line = <$input>) {
 			last;
 		}
 	}
+	next if ($no_hits);
 
 	# Recalculate counts, ban ips
+	print "summary:\n" if $verbose;
 	foreach my $ip (keys %journal) {
 
 		my $hits = $journal{$ip};
-		print "hits ($ip): [" . (join ", ", @$hits) . "]\n" if $verbose;
 		my $sum = 0;
 		foreach my $hit (@$hits) {
 			$sum += $hit;
 		}
 
 		if (0 == $sum) {
-			print "zero sum, removing $ip\n" if $verbose;
+			print " $ip: zero sum, removing\n" if $verbose;
 			delete $journal{$ip};
 			next;
 		}
+		print "  $ip: [" . (join ", ", @$hits) . "]\n" if $verbose;
 
 		if ($sum > $max_hits) {
 			print "ban: $ip\n" if $verbose;
