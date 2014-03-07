@@ -43,17 +43,13 @@ my $exists = `sudo iptables -nL $ban_chain 2>&1`;
 if ($exists =~ /No chain/) {
 	print "creating easy2ban chain\n" if $verbose;
 	`sudo iptables -N $ban_chain`;
-	#`sudo iptables -A $ban_chain -j RETURN`;
+	`sudo iptables -A $ban_chain -j RETURN`;
 	`sudo iptables -I INPUT -j $ban_chain`;
 }
 # to delete:
 # iptables -F easy2ban
-# iptables -D INPUT easy2ban
+# iptables -D INPUT -j easy2ban
 # iptables -X easy2ban
-
-# Make sure our chain is clean
-print "flushing easy2ban chain\n" if $verbose;
-`sudo iptables -F $ban_chain`;
 
 while (1) {
 
