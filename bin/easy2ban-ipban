@@ -8,7 +8,7 @@ The easy2ban-ipban daemon monitors a ban directory and
 bans IPs by creating iptables rules that drop packets from
 that IP.
 
-  ./easy2ban-ipban -d "var/bin" -v
+  easy2ban-ipban -d "var/bin" -v
 
 It assumes that there is some other daemon (easy2ban) that
 is creating the ban files and storing the ban time in minutes.
@@ -51,16 +51,62 @@ if ($exists =~ /No chain/) {
 # iptables -D INPUT -j easy2ban
 # iptables -X easy2ban
 
+# main loop:
+#
+#   - decrement the ban times in files every minute, delete expired
+#   - keep the ban files in sync with the iptables ban rules
+#
 while (1) {
+
+	decrement_banfiles($ban_dir);
+
+	my @iptables_ips = get_iptables_ips($ban_chain);
+	my @banfile_ips = get_banfile_ips($ban_dir);
+
+	# make sure all banfiles are represented in iptables
+	print "ban files\n" if ($verbose and @banfile_ips);
+	foreach my $banfile_ip (@banfile_ips) {
+		print "  $banfile_ip\n" if $verbose;
+		if (grep { ($_ eq $banfile_ip) } @iptables_ips) {
+			# already banned, OK
+		} else {
+			ipban($banfile_ip);
+		}
+	}
+
+	# make sure there are no iptables entries without a ban file
+	print "iptables:\n" if ($verbose and @iptables_ips);
+	foreach my $iptables_ip (@iptables_ips) {
+		print "  $iptables_ip\n" if $verbose;
+		if (grep { $_ eq $iptables_ip } @banfile_ips) {
+			# already banned, OK
+		} else {
+			ipunban($iptables_ip);
+		}
+	}
+
+	print "sleep 1 minute\n" if $verbose;
+	sleep 60;  # 1 minute
+}
+
+=head2 decrement_banfiles
+
+Decrement the ban time by one minute in each of the ban files.
+
+=cut
+
+sub decrement_banfiles {
+	my ($ban_dir) = @_;
 
 	my $dh;
 	if (! opendir $dh, $ban_dir) {
 		print STDERR "Couldn't open ban directory '$ban_dir': $!";
-		exit 1;
+		return 1;
 	}
 
 	my @ips = readdir $dh;
 
+	# decriment the banfile times, delete if expired
 	foreach my $ip (@ips) {
 
 		# skip unexpected file names
@@ -76,15 +122,11 @@ while (1) {
 		chomp($min);
 
 		if ($min <= 0) {
-			# if zero minutes left, delete the file, unban
+			# if zero minutes left, delete the file
 			close $ip_fh;
 			if (! unlink "$ban_dir/$ip") {
 				print STDERR "Unable to unlink '$ban_dir/$ip': $!";
-				close $ip_fh;
-				next;
 			}
-
-			ipunban($ip);
 		} else {
 			# otherwise decrement the minutes left
 
@@ -94,17 +136,66 @@ while (1) {
 			$min = $min - 1;
 
 			print $ip_fh "$min\n";
-
-			ipban($ip);
 		}
 
 		close $ip_fh;
 	}
 
 	closedir $dh;
+}
 
-	print "sleep 1 minute\n" if $verbose;
-	sleep 60;  # 1 minute
+=head2 get_iptables_ips
+
+Get the currently banned IP addresses stored in our easy2ban chain.
+
+=cut
+
+sub get_iptables_ips {
+	my ($ban_chain) = @_;
+
+	my $raw = `sudo iptables -nL $ban_chain 2>&1`;
+	my @lines = split /\n/, $raw;
+
+	my @ips;
+	foreach my $line (@lines) {
+		next if $line =~ /RETURN/;
+		if ($line =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
+			print "LINE: '$line'\n";
+			push @ips, $1;
+		}
+	}
+
+	return @ips;
+}
+
+=head2 get_iptables_ips
+
+Get a list of all the current IP addresses in the ban files.
+
+=cut
+
+sub get_banfile_ips {
+	my ($ban_dir) = @_;
+
+	my $dh;
+	if (! opendir $dh, $ban_dir) {
+		print STDERR "Couldn't open ban directory '$ban_dir': $!";
+		return ();
+	}
+
+	my @ips;
+	my @files = readdir $dh;
+
+	foreach my $file (@files) {
+		# skip file name is not an ip address
+		next if ($file !~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/);
+
+		push @ips, $file;
+	}
+
+	closedir $dh;
+
+	return @ips;
 }
 
 =head2 ipban(), ipunban()
