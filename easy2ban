@@ -9,9 +9,6 @@ and look for pattern matches.  And when matches are found
 it "bans" the ip by writting the ban time to a file.
 Some other program can take care of enforcing the ban.
 
-This program is in the earliest stages of development and
-is currently only a crude proof of concept.
-
 =cut
 
 my %opt;
