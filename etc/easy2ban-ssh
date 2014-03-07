@@ -13,4 +13,4 @@ CMD="sudo tail -qf /var/log/secure |";
 
 mkdir -p var/ban
 
-./easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME
+easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME

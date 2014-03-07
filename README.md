@@ -76,17 +76,22 @@ The second daemon in this system is easy2ban-ipban.
 It monitors the ban files and bans the host by creating iptables rules.
 It also takes care of decrementing the time left and releasing bans.
 
-As a good example to become familiar with this system the easy2ban-local
-script can be used to run easy2ban on a local.log file.
+The following examples are run from the root of this project directory.
+The $PATH will need to be set so that the programs in bin/ are found.
+
+    $ PATH=bin/:$PATH
+
+A good example for becoming familiar with this system is to try
+out the easy2ban-local script can be used to run easy2ban on a local.log file.
 
     (terminal 1)
-    $ ./easy2ban-local
+    $ ./bin/easy2ban-local
 
 Then in a second terminal start easy2ban-ipban.
-Be sure to use the -v option to display verbose output.
+Be sure to use the -v option so that verbose output is displayed.
 
     (terminal 2)
-    $ ./easy2ban-ipban -v
+    $ ./bin/easy2ban-ipban -v
 
 Then in a third terminal create some pattern log entries that will trigger
 a match.
@@ -94,6 +99,12 @@ a match.
     $ echo "192.168.3.4 XXX" >> local.log
     $ echo "192.168.3.4 XXX" >> local.log
     $ echo "192.168.3.4 XXX" >> local.log
+
+You should see ban files being created with their ban time.
+And you should see the easy2ban-ipban daemon creating iptables rules
+to ban these hosts.
+
+    $ sudo iptables -vnL easy2ban
 
 AUTHOR
 ------
