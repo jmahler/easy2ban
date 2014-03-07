@@ -23,12 +23,13 @@ and afterwards repeats the process again.
 =cut
 
 my %opt;
-getopts('d:i:vh', \%opt) or usage();
+getopts('d:i:vsh', \%opt) or usage();
 usage() if $opt{h};
 
 # Command line options
 my $ban_dir = (exists $opt{'d'}) ? $opt{'d'} : "var/ban";	# ban directory
 my $verbose = $opt{'v'};
+my $step = $opt{'s'};
 my $ban_chain = (exists $opt{'i'}) ? $opt{'i'} : "easy2ban";
 
 unless (-d $ban_dir) {
@@ -85,8 +86,13 @@ while (1) {
 		}
 	}
 
-	print "sleep 1 minute\n" if $verbose;
-	sleep 60;  # 1 minute
+	if ($step) {
+		print "press enter to recalculate\n";
+		<STDIN>
+	} else {
+		print "sleep 1 minute\n" if $verbose;
+		sleep 60;  # 1 minute
+	}
 }
 
 =head2 decrement_banfiles
@@ -233,13 +239,15 @@ sub ipunban {
 sub usage {
 	print STDERR <<"EOF";
 
-  usage: $0 -d "var/bin" [-i "easy2ban"] [-v] [-h]
+  usage: $0 -d "var/bin" [-i "easy2ban"] [-v] [-s] [-h]
 
     -d "var/bin"    : directory where ban files are stored
 
     -i "easy2ban"   : name of iptables chain to store rules
 
     -v              : verbose output
+
+    -s              : stop and wait for user input before recalculating
 
     -h              : help
 
