@@ -8,7 +8,7 @@ BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)
 MONITOR_TIME=5;  # (minutes)
 MAX_HITS=5;
-LAWS="qr/Failed password for root/, qr/more authentication failures/, qr/[Ii]nvalid user/";
+LAWS="qr/Failed password/, qr/authentication failure/, qr/[Ii]nvalid user/"
 CMD="sudo tail -qf /var/log/secure |";
 
 mkdir -p var/ban
