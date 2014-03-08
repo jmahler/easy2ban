@@ -98,8 +98,8 @@ while (my $line = <$input>) {
 
 			# skip if ip could not be found
 			if (! defined $ip) {
-				print STDERR "Got a hit, but could not find\n"
-						."  the IP in line '$line', skipping.\n";
+				print "Got a hit, but could not find\n"
+						."  an IP in line '$line', skipping.\n" if $verbose;
 				last;
 			}
 
