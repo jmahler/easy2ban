@@ -20,6 +20,11 @@ left of each as well.  When the ban time expires it un-bans the
 IP and removes the ban (IP) file.  Then it sleeps for 1 minute
 and afterwards repeats the process again.
 
+To reload the configuration before completion of a sleep
+interval, send a -HUP signal.
+
+  killall -HUP easy2ban-ipban
+
 =cut
 
 my %opt;
@@ -52,14 +57,26 @@ if ($exists =~ /No chain/) {
 # iptables -D INPUT -j easy2ban
 # iptables -X easy2ban
 
+# If a HUP is received it will break out of the
+# current sleep and reload the configuration.
+$SIG{HUP} = sub {
+	print "SIGHUP received\n" if $verbose;
+};
+
 # main loop:
 #
 #   - decrement the ban times in files every minute, delete expired
 #   - keep the ban files in sync with the iptables ban rules
 #
+my $last_min = get_minute();
 while (1) {
 
-	decrement_banfiles($ban_dir);
+	# Decrement minute counts when the minute has changed.
+	my $min = get_minute();
+	if ($min != $last_min) {
+		decrement_banfiles($ban_dir);
+		$last_min = $min;
+	}
 
 	my @iptables_ips = get_iptables_ips($ban_chain);
 	my @banfile_ips = get_banfile_ips($ban_dir);
@@ -93,6 +110,10 @@ while (1) {
 		print "sleep 1 minute\n" if $verbose;
 		sleep 60;  # 1 minute
 	}
+}
+
+sub get_minute {
+	(localtime(time))[1];
 }
 
 =head2 decrement_banfiles
