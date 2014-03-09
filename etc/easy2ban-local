@@ -7,7 +7,6 @@
 #   $ echo "192.168.2.3 FAIL" >> local.log
 #
 # Then look in var/ban to see if it creates the entries.
-#
 
 BAN_DIR="var/ban";
 

@@ -2,7 +2,6 @@
 
 # Example showning how to use easy2ban with Apache
 # error_log to look for failures.
-#
 
 BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)

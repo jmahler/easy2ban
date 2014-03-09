@@ -1,8 +1,7 @@
 #!/bin/bash -x
 
-# Example showning how to use easy2ban with Qmail maillog
+# Example showning how to use easy2ban with Qmail imap4-ssl
 # to look for password failures.
-#
 
 BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)

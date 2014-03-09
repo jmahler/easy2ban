@@ -1,8 +1,7 @@
 #!/bin/bash -x
 
-# Example showning how to use easy2ban with Apache
-# error_log to look for failures.
-#
+# Example showning how to use easy2ban to monitor
+# ssh (/var/log/secure) for password failures.
 
 BAN_DIR="var/ban";
 BAN_TIME=5;  # (minutes)
