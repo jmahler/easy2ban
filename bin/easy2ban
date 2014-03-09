@@ -197,6 +197,9 @@ sub ban {
 		}
 		print $ban_fh "$ban_interval\n";
 		close $ban_fh;
+
+		# notify the ban daemon that there is a new ban
+		`killall -HUP easy2ban-ipban`;
 	} else {
 		if (!open ($ban_fh, "+<", $ban_file)) {
 			print STDERR "Unable to open ban file '$ban_file': $!\n";
