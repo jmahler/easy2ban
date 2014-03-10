@@ -7,12 +7,12 @@ use Getopt::Std;
 easy2ban will monitor a log file or some other program
 and look for pattern matches.  And when matches are found
 it "bans" the ip by writting the ban time to a file.
-Some other program can take care of enforcing the ban.
+Another program will take care of enforcing the ban.
 
 =cut
 
 my %opt;
-getopts('c:L:x:i:d:b:vh', \%opt) or usage();
+getopts('c:L:x:i:d:b:n:vh', \%opt) or usage();
 usage() if $opt{h};
 
 # Command line options
@@ -33,6 +33,9 @@ my $ban_interval = (exists $opt{'b'}) ? $opt{'b'} : 5;		# (minutes)
 
 my $verbose = $opt{'v'};
 
+my $name = (exists $opt{'n'}) ? $opt{'n'} : $0;
+
+$|=1;  # autoflush STDOUT
 
 unless (-d $ban_dir) {
 	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
@@ -56,6 +59,8 @@ my %journal;
 #     ip => [<hits at minute 0>, <hits at minute 1> ..., <... n>]
 #  );
 
+logger("start");
+
 my $cur_minute = get_minute();
 while (my $line = <$input>) {
 	chomp($line);
@@ -68,7 +73,7 @@ while (my $line = <$input>) {
 	while ($cur_minute != $minute) {
 
 		# shift data ...
-		print "shifting data ($cur_minute, $minute)\n" if $verbose;
+		print "tick\n" if $verbose;
 		foreach my $ip (keys %journal) {
 			my $entry = $journal{$ip};
 
@@ -137,10 +142,18 @@ while (my $line = <$input>) {
 		print "  $ip: [" . (join ", ", @$hits) . "]\n" if $verbose;
 
 		if ($sum > $max_hits) {
-			print "ban: $ip\n" if $verbose;
+			logger("request ban $ip for $ban_interval minutes");
 			ban($ip, $ban_dir, $ban_interval);
 		}
 	}
+}
+
+sub logger {
+	my ($msg) = @_;
+
+	my $date = `date -R`;
+	chomp($date);
+	print "$date  $name: $msg\n";
 }
 
 sub get_minute {
@@ -243,6 +256,8 @@ sub usage {
     -d "var/bin"    : directory to store ip and times
 
     -b 5            : ban interval (minutes)
+
+    -n              : program name to use in logs
 
     -v              : verbose output
 

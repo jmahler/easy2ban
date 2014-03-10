@@ -1,15 +1,20 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # Example showning how to use easy2ban with Qmail maillog
 # to look for password failures.
 
 BAN_DIR="var/ban";
+LOG_FILE="var/log/easy2ban";
 BAN_TIME=5;  # (minutes)
 MONITOR_TIME=5;  # (minutes)
 MAX_HITS=4;
 LAWS="qr/password fail/, qr/user not found/";
 CMD="sudo qtail maillog |";
+PATH="bin:$PATH";
+NAME=`basename $0`;
 
 mkdir -p var/ban
+mkdir -p var/log
 
-easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME
+#easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME -n "$NAME"
+easy2ban -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME -n "$NAME" 2>&1 >> $LOG_FILE &
