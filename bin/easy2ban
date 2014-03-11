@@ -144,6 +144,7 @@ while (my $line = <$input>) {
 		if ($sum > $max_hits) {
 			logger("request ban $ip for $ban_interval minutes");
 			ban($ip, $ban_dir, $ban_interval);
+			delete $journal{$ip};
 		}
 	}
 }
