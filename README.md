@@ -106,6 +106,25 @@ to ban these hosts.
 
     $ sudo iptables -vnL easy2ban
 
+DESIGN
+------
+
+The design of this system is unique in several ways.
+
+Interprocess communication is accomplished using the file system.
+This allows the information to be viewed and modified using standard
+file system utilities.  This also makes it easier to debug.
+
+Typical log entries (/var/log) have an associated time.
+To keep this system simple it is ignored entirely.
+Instead, the rate of matches is kept track of in memory.
+Since no substantial time calculations are needed during startup
+it is very quick even with a large number of log files.
+
+The source of logging data can be a file but it does not have to be.
+It can also be a program the produces data.
+This makes the system general and adaptable to new situations.
+
 AUTHOR
 ------
 
