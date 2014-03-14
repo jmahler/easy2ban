@@ -114,6 +114,15 @@ The design of this system is unique in several ways.
 Interprocess communication is accomplished using the file system.
 This allows the information to be viewed and modified using standard
 file system utilities.  This also makes it easier to debug.
+For example, suppose a IP was banned and you wanted to know how much
+longer it would be banned for.  To find out just cat the ban file.
+
+    $ cat var/ban/192.168.5.12
+    15
+
+Suppose an IP should be un-banned.  To do this just remove the file.
+
+    $ rm var/ban/192.168.5.12
 
 Typical log entries (/var/log) have an associated time.
 To keep this system simple it is ignored entirely.
