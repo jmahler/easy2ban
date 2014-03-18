@@ -1,0 +1,6 @@
+
+Any rules in this directory will be used by easy2ban.
+To add a rule create a symbolic link.
+
+    # ln -s ../rules-available/easy2ban-ssh .
+
