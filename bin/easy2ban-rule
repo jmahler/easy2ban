@@ -90,7 +90,7 @@ my %journal;
 
 logger("start", $cfg{NAME});
 
-my $cur_minute = get_minute();
+my $cur_minute = (localtime(time))[1];
 while (my $line = <$input>) {
 	chomp($line);
 
@@ -98,7 +98,7 @@ while (my $line = <$input>) {
 
 	# Shift the journal of hit counts according to the
 	# number of minutes that have elapsed.
-	my $minute = get_minute();
+	my $minute = (localtime(time))[1];
 	while ($cur_minute != $minute) {
 
 		# shift data ...
@@ -177,10 +177,6 @@ sub logger {
 	my $date = `date -R`;
 	chomp($date);
 	print "$date  $name: $msg\n";
-}
-
-sub get_minute {
-	(localtime(time))[1];
 }
 
 =head2 get_ip()

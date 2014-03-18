@@ -88,12 +88,12 @@ $SIG{HUP} = sub {
 #   - decrement the ban times in files every minute, delete expired
 #   - keep the ban files in sync with the iptables ban rules
 #
-my $last_min = get_minute();
+my $last_min = (localtime(time))[1];
 logger("start");
 while (1) {
 
 	# Decrement minute counts when the minute has changed.
-	my $min = get_minute();
+	my $min = (localtime(time))[1];
 	if ($min != $last_min) {
 		decrement_banfiles($cfg{BAN_DIR});
 		$last_min = $min;
@@ -136,10 +136,6 @@ sub logger {
 	my $date = `date -R`;
 	chomp($date);
 	print "$date  $0: $msg\n";
-}
-
-sub get_minute {
-	(localtime(time))[1];
 }
 
 =head2 decrement_banfiles
