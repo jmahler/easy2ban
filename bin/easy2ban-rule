@@ -2,9 +2,9 @@
 use strict;
 use Getopt::Std;
 
-=head1 easy2ban
+=head1 easy2ban-rule
 
-easy2ban will monitor a log file or some other program
+easy2ban-rule will monitor a log file or some other program
 and look for pattern matches.  And when matches are found
 it "bans" the ip by writting the ban time to a file.
 Another program will take care of enforcing the ban.
