@@ -47,6 +47,14 @@ $|=1;  # autoflush STDOUT, it is used for logging
 
 # {{{ check config options
 
+usage() and exit 0 if ($help);
+
+unless (@cfg_files) {
+	usage();
+	print STDERR "Some config files need to be given (-c).\n";
+	exit 1;
+}
+
 # require that these options be defined
 foreach my $key (qw(LOG BAN_CHAIN BAN_DIR)) {
 	if (! exists $cfg{$key}) {
@@ -289,5 +297,4 @@ sub usage {
     -h              : help
 
 EOF
-	exit;
 }
