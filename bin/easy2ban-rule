@@ -1,65 +1,94 @@
 #!/usr/bin/perl
 use strict;
-use Getopt::Std;
+use Getopt::Long;
+use YAML qw(LoadFile);
 
 =head1 easy2ban-rule
 
 easy2ban-rule will monitor a log file or some other program
-and look for pattern matches.  And when matches are found
-it "bans" the ip by writting the ban time to a file.
+and look for pattern (rule) matches.  When matches are found
+it "bans" the IP by writting the ban time to a file.
 Another program will take care of enforcing the ban.
+
+Normally this program is run using /etc/init.d/easy2ban.
+But it can also be run directly.
+
+    $ easy2ban-rule -c /etc/easy2ban/easy2ban.conf \
+                    -c /etc/easy2ban/rules-available/easy2ban-local
 
 =cut
 
-my %opt;
-getopts('c:L:x:i:d:b:n:vh', \%opt) or usage();
-usage() if $opt{h};
+my @cfg_files;
+my $help;
+GetOptions ("config=s" 	=> \@cfg_files,
+			"help" 		=> \$help );
 
-# Command line options
-usage() if (! $opt{'c'});
-my $input_cmd = $opt{'c'};
+# Load all the config files.
+# Later options override earlier.
+my %cfg;
+foreach my $file (@cfg_files) {
+	my $xcfg = LoadFile($file);
+	%cfg = (%cfg, %$xcfg);
+}
 
-usage() if (! $opt{'L'});
-my $laws_str = $opt{'L'};
-my @laws = (eval($laws_str));
+$|=1;  # autoflush STDOUT, it is used for logging
 
-my $max_hits = (exists $opt{'x'}) ? $opt{'x'} : 2;          # max hits
+# {{{ check config options
 
-my $interval = (exists $opt{'i'}) ? $opt{'i'} : 2;			# per minutes
+usage() and exit 0 if ($help);
 
-my $ban_dir = (exists $opt{'d'}) ? $opt{'d'} : "var/ban";	# ban directory
+unless (@cfg_files) {
+	usage();
+	print STDERR "Some config files need to be given (-c).\n";
+	exit 1;
+}
 
-my $ban_interval = (exists $opt{'b'}) ? $opt{'b'} : 5;		# (minutes)
+# require that these options be defined
+foreach my $key (qw(LOG BAN_DIR BAN_TIME MONITOR_TIME MAX_HITS RULES NAME)) {
+	if (! exists $cfg{$key}) {
+		print STDERR "'$key' must be defined.\n";
+		exit 1;
+	}
+}
 
-my $verbose = $opt{'v'};
-
-my $name = (exists $opt{'n'}) ? $opt{'n'} : $0;
-
-$|=1;  # autoflush STDOUT
-
-unless (-d $ban_dir) {
-	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
+unless (-d $cfg{BAN_DIR}) {
+	print STDERR "The ban directory (BAN_DIR), '"
+				. $cfg{BAN_DIR} . "', does not exist.\n"
 				. "  Please create it and try again.\n";
 	exit 1;
 }
 
-if ($interval > 60) {
-	print STDERR "Intervals larger than 60 minutes are not supported\n";
+if ($cfg{MONITOR_TIME} > 60) {
+	print STDERR "MONITOR_TIME longer than 60 minutes is not supported.\n";
+	exit 1;
+}
+
+unless ($cfg{BAN_TIME} > 0) {
+	print STDERR "BAN_TIME must be greater than zero.\n";
 	exit 1;
 }
 
 my $input;
-open($input, "$input_cmd")
-	or die "open '$input_cmd' failed: $!\n";
+open($input, $cfg{CMD})
+	or die "Open (CMD) '" . $cfg{CMD} . "' failed: $!\n";
 
+my @rules;
+foreach my $rule_str (@{$cfg{RULES}}) {
+	push @rules, (qr/$rule_str/);
+}
 
-# Journal of IPs that have broken laws
+# }}}
+
+use Data::Dumper;
+print Dumper(\%cfg);
+
+# Journal of IPs that have broken rules
 my %journal;
 #  %journal = (
 #     ip => [<hits at minute 0>, <hits at minute 1> ..., <... n>]
 #  );
 
-logger("start");
+logger("start", $cfg{NAME});
 
 my $cur_minute = get_minute();
 while (my $line = <$input>) {
@@ -73,7 +102,6 @@ while (my $line = <$input>) {
 	while ($cur_minute != $minute) {
 
 		# shift data ...
-		print "tick\n" if $verbose;
 		foreach my $ip (keys %journal) {
 			my $entry = $journal{$ip};
 
@@ -81,7 +109,7 @@ while (my $line = <$input>) {
 			unshift @$entry, (0);
 
 			# discard oldest if beyond interval
-			if (@$entry > $interval) {
+			if (@$entry > $cfg{MONITOR_TIME}) {
 				pop @$entry;
 			}
 		}
@@ -94,22 +122,19 @@ while (my $line = <$input>) {
 		}
 	}
 
-	# Check all the laws
+	# Check all the rules
 	my $no_hits = 1;
-	foreach my $law (@laws) {
+	foreach my $rule (@rules) {
 		# If one has been broken
-		if ($line =~ $law) {
+		if ($line =~ $rule) {
 			my $ip = get_ip($line);
 
 			# skip if ip could not be found
 			if (! defined $ip) {
-				print "Got a hit, but could not find\n"
-						."  an IP in line '$line', skipping.\n" if $verbose;
 				last;
 			}
 
 			$no_hits = 0;
-			print "hit $ip\n" if $verbose;
 
 			# record hit on this IP
 			if (exists $journal{$ip}) {
@@ -125,7 +150,6 @@ while (my $line = <$input>) {
 	next if ($no_hits);
 
 	# Recalculate counts, ban ips
-	print "summary:\n" if $verbose;
 	foreach my $ip (keys %journal) {
 
 		my $hits = $journal{$ip};
@@ -135,22 +159,20 @@ while (my $line = <$input>) {
 		}
 
 		if (0 == $sum) {
-			print " $ip: zero sum, removing\n" if $verbose;
 			delete $journal{$ip};
 			next;
 		}
-		print "  $ip: [" . (join ", ", @$hits) . "]\n" if $verbose;
 
-		if ($sum > $max_hits) {
-			logger("request ban $ip for $ban_interval minutes");
-			ban($ip, $ban_dir, $ban_interval);
+		if ($sum > $cfg{MAX_HITS}) {
+			logger("request ban of $ip for $cfg{BAN_TIME} minutes", $cfg{NAME});
+			ban($ip, $cfg{BAN_DIR}, $cfg{BAN_TIME});
 			delete $journal{$ip};
 		}
 	}
 }
 
 sub logger {
-	my ($msg) = @_;
+	my ($msg, $name) = @_;
 
 	my $date = `date -R`;
 	chomp($date);
@@ -197,7 +219,7 @@ is finished.
 =cut
 
 sub ban {
-	my ($ip, $ban_dir, $ban_interval) = @_;
+	my ($ip, $ban_dir, $ban_time) = @_;
 
 	my $ban_file = "$ban_dir/$ip";
 
@@ -209,11 +231,11 @@ sub ban {
 			print STDERR "Unable to create ban file '$ban_file': $!\n";
 			return;
 		}
-		print $ban_fh "$ban_interval\n";
+		print $ban_fh "$ban_time\n";
 		close $ban_fh;
 
 		# notify the ban daemon that there is a new ban
-		`killall -HUP easy2ban-ipban`;
+		`killall -HUP easy2ban-ipban 2>&1 1>/dev/null`;
 	} else {
 		if (!open ($ban_fh, "+<", $ban_file)) {
 			print STDERR "Unable to open ban file '$ban_file': $!\n";
@@ -221,15 +243,15 @@ sub ban {
 		}
 
 		# Get the remaining ban time
-		my $cur_ban_interval = <$ban_fh>;
-		chomp($cur_ban_interval);
+		my $cur_ban_time = <$ban_fh>;
+		chomp($cur_ban_time);
 	
 		# write our time if it is longer
-		if ($ban_interval > $cur_ban_interval) {
+		if ($ban_time > $cur_ban_time) {
 			truncate $ban_fh, 0;
 			seek $ban_fh, 0, 0;
 	
-			print $ban_fh "$ban_interval\n";
+			print $ban_fh "$ban_time\n";
 		}
 
 		close $ban_fh;
@@ -239,30 +261,13 @@ sub ban {
 sub usage {
 	print STDERR <<"EOF";
 
-  usage: $0 -c "cmd" -L "qr/<regex>, ..." [-x 2] [-i 2]
-                    [-d "var/ban"] [-b 5] [-vh]
+  usage: $0 -c <config file>
 
-    -c              : data command, formatted for Perl open (pipe)
-                        "sudo tail -qf /var/log/syslog |"
-
-    -L              : laws regexes formatted for Perl
-                        "qr/password failed/, qr/LOGIN FAILED/"
-
-           Refer to the code if -c or -L do not make sense.
-
-    -x 2            : max hits per interval
-
-    -i 2            : monitor interval (minutes)
-
-    -d "var/bin"    : directory to store ip and times
-
-    -b 5            : ban interval (minutes)
-
-    -n              : program name to use in logs
-
-    -v              : verbose output
+    -c <file>       : Config file to read settings from.
+                      -c can be specified multiple times.
+                      Latter settings override earlier.
 
     -h              : help
+
 EOF
-	exit;
 }

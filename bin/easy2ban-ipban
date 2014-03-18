@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use strict;
-use Getopt::Std;
+use Getopt::Long;
+use YAML qw(LoadFile);
 
 =head1 easy2ban-ipban
 
@@ -8,7 +9,7 @@ The easy2ban-ipban daemon monitors a ban directory and
 bans IPs by creating iptables rules that drop packets from
 that IP.
 
-  easy2ban-ipban -d "var/bin" -v
+  easy2ban-ipban -c "/etc/easy2ban.conf"
 
 It assumes that there is some other daemon (easy2ban) that
 is creating the ban files and storing the ban time in minutes.
@@ -27,29 +28,44 @@ interval, send a -HUP signal.
 
 =cut
 
-my %opt;
-getopts('d:i:vsh', \%opt) or usage();
-usage() if $opt{h};
+my @cfg_files;
+my $help;
+my $step;
+GetOptions(	"config=s"	=> \@cfg_files,
+			"help"		=> \$help,
+			"step"		=> \$step);
 
-# Command line options
-my $ban_dir = (exists $opt{'d'}) ? $opt{'d'} : "var/ban";	# ban directory
-my $verbose = $opt{'v'};
-my $step = $opt{'s'};
-my $ban_chain = (exists $opt{'i'}) ? $opt{'i'} : "easy2ban";
+# Load all the config files.
+# Later options override earlier.
+my %cfg;
+foreach my $file (@cfg_files) {
+	my $xcfg = LoadFile($file);
+	%cfg = (%cfg, %$xcfg);
+}
 
-$|=1;  # autoflush STDOUT
+$|=1;  # autoflush STDOUT, it is used for logging
 
-unless (-d $ban_dir) {
-	print STDERR "The ban directory, '$ban_dir', does not exist.\n"
+# {{{ check config options
+
+# require that these options be defined
+foreach my $key (qw(LOG BAN_CHAIN BAN_DIR)) {
+	if (! exists $cfg{$key}) {
+		print STDERR "'$key' must be defined.\n";
+		exit 1;
+	}
+}
+
+unless (-d $cfg{BAN_DIR}) {
+	print STDERR "The ban directory, '" . $cfg{BAN_DIR} . "', does not exist.\n"
 				. "  Please create it and try again.\n";
 	exit 1;
 }
 
 # Make sure our ban chain exists, create it if it doesn't
+my $ban_chain = $cfg{BAN_CHAIN};
 my $exists = `sudo iptables -nL $ban_chain 2>&1`;
 # iptables: No chain/target/match by that name.
 if ($exists =~ /No chain/) {
-	print "creating easy2ban chain\n" if $verbose;
 	`sudo iptables -N $ban_chain`;
 	`sudo iptables -A $ban_chain -j RETURN`;
 	`sudo iptables -I INPUT -j $ban_chain`;
@@ -62,8 +78,10 @@ if ($exists =~ /No chain/) {
 # If a HUP is received it will break out of the
 # current sleep and reload the configuration.
 $SIG{HUP} = sub {
-	print "SIGHUP received\n" if $verbose;
+    # just breaks out of a sleep
 };
+
+# }}}
 
 # main loop:
 #
@@ -77,12 +95,12 @@ while (1) {
 	# Decrement minute counts when the minute has changed.
 	my $min = get_minute();
 	if ($min != $last_min) {
-		decrement_banfiles($ban_dir);
+		decrement_banfiles($cfg{BAN_DIR});
 		$last_min = $min;
 	}
 
 	my @iptables_ips = get_iptables_ips($ban_chain);
-	my @banfile_ips = get_banfile_ips($ban_dir);
+	my @banfile_ips = get_banfile_ips($cfg{BAN_DIR});
 
 	# make sure all banfiles are represented in iptables
 	foreach my $banfile_ip (@banfile_ips) {
@@ -108,7 +126,6 @@ while (1) {
 		print "press enter to recalculate\n";
 		<STDIN>
 	} else {
-		print "sleep 1 minute\n" if $verbose;
 		sleep 60;  # 1 minute
 	}
 }
@@ -250,10 +267,8 @@ sub ipban {
 	# check if it is currently banned
 	my $is_banned = `sudo iptables -nL $ban_chain | grep $ip`;
 	if ($is_banned) {
-		print "$ip is already banned\n" if $verbose;
 		return;
 	} else {
-		print "$ip banned (new)\n" if $verbose;
 		`sudo iptables -I $ban_chain -s $ip -j DROP`;
 	}
 }
@@ -261,20 +276,17 @@ sub ipban {
 sub ipunban {
 	my ($ip) = @_;
 
-	print "unban: $ip\n" if $verbose;
 	`sudo iptables -D $ban_chain -s $ip -j DROP 2>&1`;
 }
 
 sub usage {
 	print STDERR <<"EOF";
 
-  usage: $0 -d "var/bin" [-i "easy2ban"] [-v] [-s] [-h]
+  usage: $0 -c "var/bin" [-s]
 
-    -d "var/bin"    : directory where ban files are stored
-
-    -i "easy2ban"   : name of iptables chain to store rules
-
-    -v              : verbose output
+    -c <file>       : Config file to read settings from.
+                      -c can be specified multiple times.
+                      Latter settings override earlier.
 
     -s              : stop and wait for user input before recalculating
 

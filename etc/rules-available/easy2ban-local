@@ -1,17 +1,21 @@
-#!/bin/bash -x
 
 # Example showning how to use easy2ban with a local
 # log file.  To generate entries just echo some data.
 #
 #   $ echo "192.168.2.3 XXX" >> local.log
-#   $ echo "192.168.2.3 FAIL" >> local.log
 #
 # Then look in var/ban to see if it creates the entries.
 
-BAN_DIR="var/ban";
+NAME: "easy2ban-local"
 
-touch local.log
-mkdir -p var/ban
+CMD: "tail -n 0 -qf local.log |"
 
-easy2ban -v -c "tail -qf local.log |" -L "qr/XXX/, qr/FAIL/" -x 2 -i 2 -d "$BAN_DIR" -b 5
+RULES:
+   - "XXX"
+# Perl regexe in /<str>/
+
+# (minutes)
+BAN_TIME	: 5
+MONITOR_TIME: 2
+MAX_HITS	: 2
 

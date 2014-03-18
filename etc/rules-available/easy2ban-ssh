@@ -1,20 +1,18 @@
-#!/bin/bash
 
-# Example showning how to use easy2ban to monitor
-# ssh (/var/log/secure) for password failures.
+# Monitor /var/log/secure for ssh attacks.
 
-BAN_DIR="var/ban";
-LOG_FILE="var/log/easy2ban";
-BAN_TIME=5;  # (minutes)
-MONITOR_TIME=5;  # (minutes)
-MAX_HITS=5;
-LAWS="qr/Failed password/, qr/authentication failure/, qr/[Ii]nvalid user/"
-CMD="sudo tail -qf /var/log/secure |";
-PATH="bin:$PATH";
-NAME=`basename $0`;
+NAME: "easy2ban-ssh"
 
-mkdir -p var/ban
-mkdir -p var/log
+CMD: "sudo tail -qf /var/log/secure |"
 
-#easy2ban -v -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME -n "$NAME"
-easy2ban -c "$CMD" -L "$LAWS" -x $MAX_HITS -i $MONITOR_TIME -d $BAN_DIR -b $BAN_TIME -n "$NAME" 2>&1 >> $LOG_FILE &
+RULES:
+   - "Failed password"
+   - "authentication failure"
+   - "[Ii]nvalid user"
+# Perl regexe in /<str>/
+
+# (minutes)
+BAN_TIME	: 5
+MONITOR_TIME: 5
+MAX_HITS	: 5
+
