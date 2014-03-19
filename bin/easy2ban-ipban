@@ -28,12 +28,19 @@ interval, send a -HUP signal.
 
 =cut
 
+# {{{ check config options
+
 my @cfg_files;
 my $help;
 my $step;
 GetOptions(	"config=s"	=> \@cfg_files,
 			"help"		=> \$help,
 			"step"		=> \$step);
+
+# If no config files specified, try the default
+unless (@cfg_files) {
+	@cfg_files = ('/etc/easy2ban/easy2ban.conf');
+}
 
 # Load all the config files.
 # Later options override earlier.
@@ -45,15 +52,7 @@ foreach my $file (@cfg_files) {
 
 $|=1;  # autoflush STDOUT, it is used for logging
 
-# {{{ check config options
-
 usage() and exit 0 if ($help);
-
-unless (@cfg_files) {
-	usage();
-	print STDERR "Some config files need to be given (-c).\n";
-	exit 1;
-}
 
 # require that these options be defined
 foreach my $key (qw(LOG BAN_CHAIN BAN_DIR)) {
@@ -286,7 +285,7 @@ sub ipunban {
 sub usage {
 	print STDERR <<"EOF";
 
-  usage: $0 -c "var/bin" [-s]
+  usage: $0 [-c "/etc/easy2ban/easy2ban.conf"] [-s]
 
     -c <file>       : Config file to read settings from.
                       -c can be specified multiple times.
