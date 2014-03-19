@@ -168,7 +168,7 @@ while (my $line = <$input>) {
 		}
 
 		if ($sum > $cfg{MAX_HITS}) {
-			syslog('info', "request ban of $ip for $cfg{BAN_TIME} minutes");
+			syslog('info', "request ban of $ip for $cfg{BAN_TIME}m");
 			ban($ip, $cfg{BAN_DIR}, $cfg{BAN_TIME});
 			delete $journal{$ip};
 		}
