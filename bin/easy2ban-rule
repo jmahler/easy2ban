@@ -79,9 +79,6 @@ foreach my $rule_str (@{$cfg{RULES}}) {
 
 # }}}
 
-use Data::Dumper;
-print Dumper(\%cfg);
-
 # Journal of IPs that have broken rules
 my %journal;
 #  %journal = (
