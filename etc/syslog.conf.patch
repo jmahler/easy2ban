@@ -4,7 +4,7 @@
  # Save news errors of level crit and higher in a special file.
  uucp,news.crit                                         /var/log/spooler
  
-+# log eas2ban messages to its own file
++# log easy2ban messages to its own file
 +local0.*                                               /var/log/easy2ban
 +
  # Save boot messages also to boot.log
