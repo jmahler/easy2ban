@@ -1,3 +1,4 @@
 *.swp
 log.txt
 *.log
+etc/easy2ban/rules-enabled/*.conf
