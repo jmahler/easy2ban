@@ -2,6 +2,7 @@
 use strict;
 use Getopt::Long;
 use YAML qw(LoadFile);
+use Sys::Syslog qw(:standard);
 
 =head1 easy2ban-rule
 
@@ -44,7 +45,7 @@ unless (@cfg_files) {
 }
 
 # require that these options be defined
-foreach my $key (qw(LOG BAN_DIR BAN_TIME MONITOR_TIME MAX_HITS RULES NAME)) {
+foreach my $key (qw(LOG_FACILITY BAN_DIR BAN_TIME MONITOR_TIME MAX_HITS RULES NAME)) {
 	if (! exists $cfg{$key}) {
 		print STDERR "'$key' must be defined.\n";
 		exit 1;
@@ -77,6 +78,12 @@ foreach my $rule_str (@{$cfg{RULES}}) {
 	push @rules, (qr/$rule_str/);
 }
 
+# syslog options
+my $ident = $cfg{NAME};
+my $facility = $cfg{LOG_FACILITY};
+my $logopt = "ndelay,pid";
+openlog($ident, $logopt, $facility);
+
 # }}}
 
 # Journal of IPs that have broken rules
@@ -85,7 +92,7 @@ my %journal;
 #     ip => [<hits at minute 0>, <hits at minute 1> ..., <... n>]
 #  );
 
-logger("start", $cfg{NAME});
+syslog('info', 'start');
 
 my $cur_minute = (localtime(time))[1];
 while (my $line = <$input>) {
@@ -161,20 +168,14 @@ while (my $line = <$input>) {
 		}
 
 		if ($sum > $cfg{MAX_HITS}) {
-			logger("request ban of $ip for $cfg{BAN_TIME} minutes", $cfg{NAME});
+			syslog('info', "request ban of $ip for $cfg{BAN_TIME} minutes");
 			ban($ip, $cfg{BAN_DIR}, $cfg{BAN_TIME});
 			delete $journal{$ip};
 		}
 	}
 }
 
-sub logger {
-	my ($msg, $name) = @_;
-
-	my $date = `date -R`;
-	chomp($date);
-	print "$date  $name: $msg\n";
-}
+closelog();
 
 =head2 get_ip()
 

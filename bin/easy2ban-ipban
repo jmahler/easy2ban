@@ -2,6 +2,7 @@
 use strict;
 use Getopt::Long;
 use YAML qw(LoadFile);
+use Sys::Syslog qw(:standard);
 
 =head1 easy2ban-ipban
 
@@ -55,7 +56,7 @@ $|=1;  # autoflush STDOUT, it is used for logging
 usage() and exit 0 if ($help);
 
 # require that these options be defined
-foreach my $key (qw(LOG BAN_CHAIN BAN_DIR)) {
+foreach my $key (qw(LOG_FACILITY BAN_CHAIN BAN_DIR)) {
 	if (! exists $cfg{$key}) {
 		print STDERR "'$key' must be defined.\n";
 		exit 1;
@@ -88,6 +89,12 @@ $SIG{HUP} = sub {
     # just breaks out of a sleep
 };
 
+# syslog options
+my $ident = "easyban-ipban";
+my $facility = $cfg{LOG_FACILITY};
+my $logopt = "ndelay,pid";
+openlog($ident, $logopt, $facility);
+
 # }}}
 
 # main loop:
@@ -96,7 +103,7 @@ $SIG{HUP} = sub {
 #   - keep the ban files in sync with the iptables ban rules
 #
 my $last_min = (localtime(time))[1];
-logger("start");
+syslog('info', 'start');
 while (1) {
 
 	# Decrement minute counts when the minute has changed.
@@ -114,7 +121,7 @@ while (1) {
 		if (grep { ($_ eq $banfile_ip) } @iptables_ips) {
 			# already banned, OK
 		} else {
-			logger("banned $banfile_ip");
+			syslog('info', "banned $banfile_ip");
 			ipban($banfile_ip);
 		}
 	}
@@ -124,7 +131,7 @@ while (1) {
 		if (grep { $_ eq $iptables_ip } @banfile_ips) {
 			# already banned, OK
 		} else {
-			logger("unban $iptables_ip");
+			syslog('info', "unbanned $iptables_ip");
 			ipunban($iptables_ip);
 		}
 	}
@@ -137,13 +144,7 @@ while (1) {
 	}
 }
 
-sub logger {
-	my ($msg) = @_;
-
-	my $date = `date -R`;
-	chomp($date);
-	print "$date  $0: $msg\n";
-}
+closelog();
 
 =head2 decrement_banfiles
 
