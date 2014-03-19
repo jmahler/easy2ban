@@ -1,0 +1,62 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          easy2ban
+# Required-Start:    $syslog
+# Required-Stop:     $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: IP address banning daemon.
+# Description:       Monitors log files or processes and bans IP addresses
+#                    of hosts that match rules which indicate malicious
+#                    activity.
+### END INIT INFO
+
+# Author: Jeremiah Mahler <jmmahler@gmail.com>
+
+DESC="easy2ban daemon"
+NAME=easy2ban
+
+PIDS=/var/run/easy2ban/pid/
+BANS=/var/run/easy2ban/ban/
+CONF=/etc/easy2ban/easy2ban.conf
+RULES=`ls /etc/easy2ban/rules-enabled/*.conf 2>/dev/null`
+LOG=/var/log/easy2ban
+
+. /lib/lsb/init-functions
+
+case "$1" in
+	start)
+		log_daemon_msg "Starting easy2ban-ipban" "easy2ban-ipban"
+		start-stop-daemon --start --make-pidfile --pidfile $PIDS/easy2ban-ipban.pid --background --exec /usr/bin/easy2ban-ipban
+		status=$?
+		log_end_msg $status
+
+		for rule in $RULES; do
+			brule=`basename $rule`
+			log_daemon_msg "Starting easy2ban-rule" "$brule"
+			start-stop-daemon --start --make-pidfile --pidfile $PIDS/easy2ban-rule.$brule.pid --background --exec /usr/bin/easy2ban-rule -- -c $CONF -c $rule
+			status=$?
+			log_end_msg $status
+		done
+		;;
+	stop)
+		log_daemon_msg "Stopping easy2ban-ipban" "easy2ban-ipban"
+		start-stop-daemon --stop --pidfile $PIDS/easy2ban-ipban.pid
+		status=$?
+		log_end_msg $status
+
+		for rule in $RULES; do
+			brule=`basename $rule`
+			log_daemon_msg "Stopping easy2ban-rule" "$brule"
+			start-stop-daemon --stop --pidfile $PIDS/easy2ban-rule.$brule.pid
+			status=$?
+			log_end_msg $status
+		done
+		;;
+	*)
+		echo "Usage: easy2ban [start|stop]" >&2
+		exit 3
+		;;
+esac
+
+exit 0
