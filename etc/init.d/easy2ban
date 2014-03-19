@@ -20,7 +20,6 @@ PIDS=/var/run/easy2ban/pid/
 BANS=/var/run/easy2ban/ban/
 CONF=/etc/easy2ban/easy2ban.conf
 RULES=`ls /etc/easy2ban/rules-enabled/*.conf 2>/dev/null`
-LOG=/var/log/easy2ban
 
 . /lib/lsb/init-functions
 
