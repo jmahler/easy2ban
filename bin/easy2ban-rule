@@ -222,7 +222,7 @@ sub ban {
 
 	if (! -e $ban_file) {
 		if (!open ($ban_fh, ">", $ban_file)) {
-			print STDERR "Unable to create ban file '$ban_file': $!\n";
+			syslog('warning', "Unable to create ban file '$ban_file': $!\n");
 			return;
 		}
 		print $ban_fh "$ban_time\n";
@@ -232,7 +232,7 @@ sub ban {
 		`killall -HUP easy2ban-ipban 2>&1 1>/dev/null`;
 	} else {
 		if (!open ($ban_fh, "+<", $ban_file)) {
-			print STDERR "Unable to open ban file '$ban_file': $!\n";
+			syslog('warning', "Unable to open ban file '$ban_file': $!\n");
 			return;
 		}
 
