@@ -157,7 +157,7 @@ sub decrement_banfiles {
 
 	my $dh;
 	if (! opendir $dh, $ban_dir) {
-		print STDERR "Couldn't open ban directory '$ban_dir': $!";
+		syslog('warning', "Couldn't open ban directory '$ban_dir': $!");
 		return 1;
 	}
 
@@ -171,7 +171,7 @@ sub decrement_banfiles {
 
 		my $ip_fh;
 		if (! open($ip_fh, "+<", "$ban_dir/$ip")) {
-			print STDERR "Unable to open '$ban_dir/$ip': $!";
+			syslog('warning', "Unable to open '$ban_dir/$ip': $!");
 			next;
 		}
 		# read the minutes left
@@ -182,7 +182,7 @@ sub decrement_banfiles {
 			# if zero minutes left, delete the file
 			close $ip_fh;
 			if (! unlink "$ban_dir/$ip") {
-				print STDERR "Unable to unlink '$ban_dir/$ip': $!";
+				syslog('warning', "Unable to unlink '$ban_dir/$ip': $!");
 			}
 		} else {
 			# otherwise decrement the minutes left
@@ -235,7 +235,7 @@ sub get_banfile_ips {
 
 	my $dh;
 	if (! opendir $dh, $ban_dir) {
-		print STDERR "Couldn't open ban directory '$ban_dir': $!";
+		syslog('warning', "Couldn't open ban directory '$ban_dir': $!");
 		return ();
 	}
 
