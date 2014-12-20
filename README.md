@@ -138,8 +138,8 @@ This makes the system general and adaptable to new situations.
 AUTHOR
 ------
 
-Jeremiah Mahler <jmmahler@gmail.com>
-https://plus.google.com/+JeremiahMahler/about
+Jeremiah Mahler <jmmahler@gmail.com><br>
+<http://github.com/jmahler>
 
 COPYRIGHT
 ---------
